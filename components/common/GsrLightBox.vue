@@ -1,0 +1,1977 @@
+<template>
+	<transition name="cool-lightbox-modal">
+		<div
+				v-if="isVisible"
+				class="cool-lightbox"
+				:class="lightboxClasses"
+				:style="lightboxStyles"
+				@click="closeModal"
+		>
+			<div v-if="gallery" class="cool-lightbox-thumbs">
+				<div class="cool-lightbox-thumbs__list">
+          <!-- TODO: replace button with an appropriate tag -->
+					<button
+							v-for="(item, itemIndex) in items"
+							:key="itemIndex"
+							type="button"
+							:class="{
+								active: itemIndex === imgIndex,
+								'is-video': getVideoUrl(getItemSrc(itemIndex))
+							}"
+							class="cool-lightbox__thumb"
+							@click="imgIndex = itemIndex"
+					>
+						<svg
+								v-if="getVideoUrl(getItemSrc(itemIndex))" class="cool-lightbox__thumb__icon"
+								xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+						>
+							<path d="M6.5 5.4v13.2l11-6.6z" />
+						</svg>
+
+            <nuxt-img
+              :src="pathURL(itemThumb(getItemSrc(itemIndex), itemIndex))"
+               alt=""
+               loading="lazy"
+            />
+					</button>
+				</div>
+			</div>
+			<!--/cool-lightbox-thumbs-->
+
+			<div
+					class="cool-lightbox__inner"
+					:style="innerStyles"
+
+					@mousedown="startSwipe"
+					@mousemove="continueSwipe"
+					@mouseup="endSwipe"
+					@touchstart="startSwipe"
+					@touchmove="continueSwipe"
+					@touchend="endSwipe"
+			>
+				<div class="cool-lightbox__progressbar" :style="stylesInterval" />
+
+				<div class="cool-lightbox__navigation">
+					<button
+							v-show="(hasPrevious || loopData) && items.length > 1" type="button"
+							class="cool-lightbox-button cool-lightbox-button--prev" title="Previous"
+							:class="buttonsClasses" @click="onPrevClick"
+					>
+						<slot name="icon-previous">
+							<div class="cool-lightbox-button__icon">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.28 15.7l-1.34 1.37L5 12l4.94-5.07 1.34 1.38-2.68 2.72H19v1.94H8.6z" /></svg>
+							</div>
+						</slot>
+					</button>
+
+					<button
+							v-show="(hasNext || loopData) && items.length > 1" type="button"
+							class="cool-lightbox-button cool-lightbox-button--next" title="Next"
+							:class="buttonsClasses" @click="onNextClick(false)"
+					>
+						<slot name="icon-next">
+							<div class="cool-lightbox-button__icon">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.4 12.97l-2.68 2.72 1.34 1.38L19 12l-4.94-5.07-1.34 1.38 2.68 2.72H5v1.94z" /></svg>
+							</div>
+						</slot>
+					</button>
+				</div>
+				<!--/cool-lightbox__navigation-->
+
+				<div
+						v-if="effect === 'swipe'"
+						class="cool-lightbox__wrapper cool-lightbox__wrapper--swipe"
+						:style="{
+							transform: 'translate3d('+xSwipeWrapper+'px, '+ySwipeWrapper+'px, 0)',
+							transition: swipeAnimation
+						}"
+				>
+					<div
+							v-for="(item, itemIndex) in items"
+							:key="itemIndex"
+							ref="items"
+							class="cool-lightbox__slide"
+							:class="{ 'cool-lightbox__slide--current': itemIndex === imgIndex }"
+					>
+						<div
+								v-if="!getVideoUrl(getItemSrc(itemIndex))" key="image"
+								:style="imgWrapperStyle" class="cool-lightbox__slide__img"
+						>
+              <nuxt-img
+                  :key="itemIndex"
+				  :src="pathURL(getItemSrc(itemIndex))"
+				  quality=100
+                  loading="lazy"
+                  sizes="sm:100vw lg:100vw xl:100vw xxl:100vw"
+									draggable="false"
+
+									@load="imageLoaded"
+									@click="zoomImage(itemIndex)"
+									@mousedown="handleMouseDown($event)"
+									@mouseup="handleMouseUp($event)"
+									@mousemove="handleMouseMove($event)"
+
+									@touchstart="handleMouseDown($event)"
+									@touchmove="handleMouseMove($event)"
+									@touchend="handleMouseUp($event)"
+              />
+
+							<div v-show="imageLoading" class="cool-lightbox-loading-wrapper">
+								<slot name="loading">
+									<div class="cool-lightbox-loading" />
+								</slot>
+							</div>
+							<!--/loading-wrapper-->
+						</div>
+						<!--/imgs-slide-->
+
+						<div
+								v-else key="video"
+								class="cool-lightbox__iframe"
+						>
+							<iframe
+									v-if="!checkIsMp4(getItemSrc(itemIndex))"
+									:key="itemIndex"
+									class="cool-lightbox-video"
+									:src="getVideoUrl(getItemSrc(itemIndex))"
+									:style="aspectRatioVideo"
+									frameborder="0"
+									allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+									allowfullscreen
+							/>
+
+							<video
+									v-if="checkIsMp4(getItemSrc(itemIndex))" :key="checkIsMp4(getItemSrc(itemIndex))"
+									class="cool-lightbox-video" :style="aspectRatioVideo"
+									controls="" controlslist="nodownload"
+									poster=""
+							>
+								<source :src="checkIsMp4(getItemSrc(itemIndex))" type="video/mp4">
+								Sorry, your browser doesn't support embedded videos
+							</video>
+						</div>
+						<!--/cool-lightbox__iframe-->
+					</div>
+					<!--/cool-lightbox__slide-->
+				</div>
+				<!--/cool-lightbox-wrapper-->
+
+				<div v-if="effect === 'fade'" class="cool-lightbox__wrapper">
+					<div
+							ref="items"
+							class="cool-lightbox__slide cool-lightbox__slide--current"
+					>
+						<transition name="cool-lightbox-slide-change" mode="out-in">
+							<div
+									v-if="!getVideoUrl(getItemSrc(imgIndex))" key="image"
+									:style="imgWrapperStyle" class="cool-lightbox__slide__img"
+							>
+								<transition name="cool-lightbox-slide-change" mode="out-in">
+
+                  <!-- need to test -->
+									<nuxt-img
+											:key="imgIndex"
+											:src="pathURL(getItemSrc(imgIndex))"
+											draggable="false"
+
+											@load="imageLoaded"
+											@click="zoomImage"
+											@mousedown="handleMouseDown($event)"
+											@mouseup="handleMouseUp($event)"
+											@mousemove="handleMouseMove($event)"
+									/>
+								</transition>
+
+								<div v-show="imageLoading" class="cool-lightbox-loading-wrapper">
+									<slot name="loading">
+										<div class="cool-lightbox-loading" />
+									</slot>
+								</div>
+								<!--/loading-wrapper-->
+							</div>
+							<!--/imgs-slide-->
+
+							<div
+									v-else key="video"
+									class="cool-lightbox__iframe"
+							>
+								<transition name="cool-lightbox-slide-change" mode="out-in">
+									<iframe
+											v-if="!checkIsMp4(getItemSrc(imgIndex))"
+											:key="getVideoUrl(getItemSrc(imgIndex))"
+											class="cool-lightbox-video"
+											:src="getVideoUrl(getItemSrc(imgIndex))"
+											:style="aspectRatioVideo"
+											frameborder="0"
+											allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+											allowfullscreen
+									/>
+
+									<video
+											v-if="checkIsMp4(getItemSrc(imgIndex))" :key="checkIsMp4(getItemSrc(imgIndex))"
+											class="cool-lightbox-video" :style="aspectRatioVideo"
+											controls="" controlslist="nodownload"
+											poster=""
+									>
+										<source :src="checkIsMp4(getItemSrc(imgIndex))" type="video/mp4">
+										Sorry, your browser doesn't support embedded videos
+									</video>
+								</transition>
+							</div>
+							<!--/cool-lightbox__iframe-->
+						</transition>
+					</div>
+					<!--/cool-lightbox__slide-->
+				</div>
+				<!--/cool-lightbox__wrapper-->
+
+				<transition name="modal">
+					<div
+							v-show="checkIfIsObject(imgIndex) && (items[imgIndex].title || items[imgIndex].description)" key="caption-block"
+							class="cool-lightbox-caption"
+					>
+						<transition name="cool-lightbox-slide-change" mode="out-in">
+							<h6 v-if="checkIfIsObject(imgIndex) && items[imgIndex].title" key="title">
+								{{ items[imgIndex].title }}
+							</h6>
+						</transition>
+
+						<transition name="cool-lightbox-slide-change" mode="out-in">
+							<p v-if="checkIfIsObject(imgIndex) && items[imgIndex].description" key="description">
+								{{ items[imgIndex].description }}
+							</p>
+						</transition>
+					</div>
+					<!--/cool-lightbox-caption-->
+				</transition>
+
+				<div class="cool-lightbox-toolbar" :class="buttonsClasses">
+					<button
+							v-if="slideshow && items.length > 1" type="button"
+							title="Play slideshow" class="cool-lightbox-toolbar__btn"
+							@click="togglePlaySlideshow"
+					>
+						<svg
+								v-if="!isPlayingSlideShow" xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+						>
+							<path d="M6.5 5.4v13.2l11-6.6z" />
+						</svg>
+
+						<svg v-else xmlns="http://www.w3.org/2000/svg">
+							<g>
+								<rect
+										id="svg_4" height="11.97529"
+										width="11.728392" y="6.030873"
+										x="6.259265" stroke-width="1.5"
+										stroke="#000" fill="#000000"
+								/>
+							</g>
+						</svg>
+					</button>
+
+					<button
+							v-if="items.length > 1 && gallery" type="button"
+							title="Show thumbnails" class="cool-lightbox-toolbar__btn"
+							@click="showThumbs = !showThumbs"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+							<path
+									d="M14.59 14.59h3.76v3.76h-3.76v-3.76zm-4.47
+              0h3.76v3.76h-3.76v-3.76zm-4.47 0h3.76v3.76H5.65v-3.76zm8.94-4.47h3.76v3.76h-3.76v-3.76zm-4.47
+              0h3.76v3.76h-3.76v-3.76zm-4.47 0h3.76v3.76H5.65v-3.76zm8.94-4.47h3.76v3.76h-3.76V5.65zm-4.47
+              0h3.76v3.76h-3.76V5.65zm-4.47 0h3.76v3.76H5.65V5.65z"
+							/>
+						</svg>
+					</button>
+
+					<button
+							v-if="fullScreen" type="button"
+							class="cool-lightbox-toolbar__btn" title="Fullscreen"
+							@click="toggleFullScreenMode"
+					>
+						<svg
+								width="20px" height="20px"
+								viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"
+						>
+							<path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z" />
+						</svg>
+					</button>
+
+					<button
+							type="button" class="cool-lightbox-toolbar__btn"
+							title="Close" @click="close"
+					>
+						<slot name="close">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+								<path d="M12 10.6L6.6 5.2 5.2 6.6l5.4 5.4-5.4 5.4 1.4 1.4 5.4-5.4 5.4 5.4 1.4-1.4-5.4-5.4 5.4-5.4-1.4-1.4-5.4 5.4z" />
+							</svg>
+						</slot>
+					</button>
+				</div>
+				<!--/cool-lightbox--toolbar-->
+			</div>
+			<!--/cool-lightbox-inner-->
+		</div>
+		<!--/cool-lightbox-->
+	</transition>
+	<!--/transition-->
+</template>
+
+<script>
+import {imageHelper} from "@/mixins/imageHelper";
+export default {
+  mixins: [imageHelper],
+	props: {
+		// eslint-disable-next-line vue/require-prop-types
+		index: {
+			required: true,
+		},
+		effect: {
+			type: String,
+			default: 'swipe',
+		},
+
+		items: {
+			type: Array,
+			required: true,
+		},
+
+		loop: {
+			type: Boolean,
+			default: true,
+		},
+
+		slideshow: {
+			type: Boolean,
+			default: true,
+		},
+
+		slideshowColorBar: {
+			type: String,
+			default: '#fa4242',
+		},
+
+		slideshowDuration: {
+			type: Number,
+			default: 3000,
+		},
+
+		srcName: {
+			type: String,
+			default: 'src',
+		},
+
+		srcThumb: {
+			type: String,
+			default: 'thumb',
+		},
+
+		overlayColor: {
+			type: String,
+			default: 'rgba(30, 30, 30, .9)',
+		},
+
+		zIndex: {
+			type: Number,
+			default: 9999,
+		},
+
+		gallery: {
+			type: Boolean,
+			default: true,
+		},
+
+		fullScreen: {
+			type: Boolean,
+			default: false,
+		},
+
+		thumbsPosition: {
+			type: String,
+			default: 'right',
+		},
+	},
+
+	data() {
+		return {
+			// swipe data
+			initialMouseX: 0,
+			initialMouseY: 0,
+			endMouseX: 0,
+			endMouseY: 0,
+			swipeType: null,
+			IsSwipping: false,
+			isDraggingSwipe: false,
+
+			// swipe effect
+			xSwipeWrapper: 0,
+			ySwipeWrapper: 0,
+			swipeAnimation: null,
+			swipeInterval: null,
+			lightboxInnerWidth: null,
+
+			// styles data
+			imgIndex: this.index,
+			isVisible: false,
+			paddingBottom: false,
+			imageLoading: false,
+			showThumbs: true,
+			isFullScreenMode: false,
+
+			// aspect ratio videos
+			aspectRatioVideo: {
+				width: 'auto',
+				height: 'auto',
+			},
+
+			// props to bind styles
+			buttonsVisible: true,
+			scale: 1,
+			top: 0,
+			left: 0,
+			lastX: 0,
+			lastY: 0,
+			isDraging: false,
+			canZoom: false,
+			isZooming: false,
+			transition: 'all .3s ease',
+
+			// slideshow playing data
+			isPlayingSlideShow: false,
+			intervalProgress: null,
+			loopData: false,
+			stylesInterval: {
+				display: 'block',
+			},
+		};
+	},
+
+	computed: {
+
+		// Images wrapper styles to use drag and zoom
+		imgWrapperStyle() {
+			return {
+				top: '50%',
+				left: '50%',
+				transition: this.transition,
+			};
+		},
+
+		// lightbox styles
+		lightboxStyles() {
+			return {
+				'z-index': this.zIndex,
+				'background-color': this.overlayColor,
+			};
+		},
+
+		innerStyles() {
+			return {
+				'padding-bottom': this.paddingBottom + 'px',
+			};
+		},
+
+		// get item src
+		itemSrc() {
+			if (this.imgIndex === null) {
+				return false;
+			}
+
+			const item = this.items[this.imgIndex];
+			if (this.checkIfIsObject(this.imgIndex)) {
+				return item[this.srcName];
+			}
+
+			return item;
+		},
+
+		// Lightbox classes
+		lightboxClasses() {
+			const classesReturn = [
+				{ 'cool-lightbox--can-zoom': this.canZoom },
+				{ 'cool-lightbox--is-zooming': this.isZooming },
+				{ 'cool-lightbox--show-thumbs': this.showThumbs },
+				{ 'cool-lightbox--is-swipping': this.isDraggingSwipe },
+			];
+
+			const classString = 'cool-lightbox--thumbs-' + this.thumbsPosition;
+			classesReturn.push(classString);
+
+			return classesReturn;
+		},
+
+		// Buttons classes
+		buttonsClasses() {
+			return {
+				hidden: !this.buttonsVisible,
+			};
+		},
+
+		// check if the slide has next element
+		hasNext() {
+			return (this.imgIndex + 1 < this.items.length);
+		},
+
+		// check if the slide has previous element
+		hasPrevious() {
+			return (this.imgIndex - 1 >= 0);
+		},
+	},
+
+	watch: {
+		showThumbs(prev, val) {
+			let widthGalleryBlock = 212;
+			let swipeAnimation = 'all .3s ease';
+			if (window.innerWidth < 767) {
+				widthGalleryBlock = 102;
+				swipeAnimation = null;
+			}
+
+			const self = this;
+			this.swipeAnimation = swipeAnimation;
+
+			if (prev) {
+				this.xSwipeWrapper = -this.imgIndex * (window.innerWidth - widthGalleryBlock) - 30 * this.imgIndex;
+			}
+			else {
+				this.xSwipeWrapper = -this.imgIndex * window.innerWidth - 30 * this.imgIndex;
+			}
+
+			setTimeout(function() {
+				self.swipeAnimation = null;
+			}, 300);
+		},
+
+		index(prev, val) {
+			const self = this;
+
+			if (prev !== null) {
+				// swipe type
+				this.swipeType = null;
+				this.initialMouseY = 0;
+				this.ySwipeWrapper = 0;
+
+				// set loop from data
+				this.loopData = this.loop;
+
+				// swipe effect case remove loop
+				if (this.effect === 'swipe') {
+					this.loopData = false;
+				}
+
+				// add img index
+				this.imgIndex = prev;
+				this.isVisible = true;
+
+				// add events listener
+				window.addEventListener('keydown', this.eventListener);
+
+				// only in mobile
+				if (window.innerWidth < 700) {
+					// add click event
+					setTimeout(function() {
+						window.addEventListener('click', self.showButtons);
+					}, 200);
+				}
+
+				// remove scroll
+				document.getElementsByTagName('body')[0].style = 'overflow: hidden';
+			}
+			else {
+				// hide and stop slideshow
+				this.isVisible = false;
+				this.stopSlideShow();
+
+				// set starts X to 0
+				this.startsX = 0;
+				this.initialMouseY = 0;
+				this.swipeType = null;
+
+				// clear interval
+				clearInterval(this.swipeInterval);
+				this.swipeAnimation = null;
+
+				// finish swipe
+				this.isDraggingSwipe = false;
+				this.isZooming = true;
+
+				// remove events listener
+				window.removeEventListener('keydown', this.eventListener);
+
+				// remove styles avoid scroll
+				document.getElementsByTagName('body')[0].style.overflow = '';
+
+				// remove click event
+				window.removeEventListener('click', this.showButtons);
+			}
+		},
+
+		imgIndex(prev, val) {
+			// when animation is loaded
+			this.$nextTick(() => {
+				if (this.effect === 'swipe') {
+					this.setLightboxInnerWidth();
+					this.setXPosition(prev);
+				}
+
+				if (prev !== null & val === null) {
+					this.$emit('on-open', prev);
+				}
+
+				if (prev !== null) {
+					// if is an image change imageLoading to true
+					if (!this.getVideoUrl(this.getItemSrc(prev))) {
+						if (!this.is_cached(this.getItemSrc(prev))) {
+							this.imageLoading = true;
+						}
+					}
+
+					// add caption padding to Lightbox wrapper
+					this.addCaptionPadding();
+
+					// check if user can zoom
+					this.checkZoom();
+				}
+
+				// reset zoom
+				this.resetZoom();
+
+				// reset swipe type
+				this.swipeType = null;
+				this.ySwipeWrapper = 0;
+
+				// setAspectRatioVideo when is swipe
+				if (this.effect === 'swipe') {
+					this.setAspectRatioVideo();
+				}
+				else if (this.getVideoUrl(this.getItemSrc(prev))) {
+					this.setAspectRatioVideo();
+				}
+			});
+		},
+	},
+
+	methods: {
+		toggleFullScreenMode() {
+			if (this.isFullScreenMode) {
+				this.closeFullscreen();
+			}
+			else {
+				this.fullScreenMode();
+			}
+
+			this.isFullScreenMode = !this.isFullScreenMode;
+		},
+
+		closeFullscreen() {
+			if (document.exitFullscreen) {
+				document.exitFullscreen();
+			}
+			else if (document.mozCancelFullScreen) { /* Firefox */
+				document.mozCancelFullScreen();
+			}
+			else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+				document.webkitExitFullscreen();
+			}
+			else if (document.msExitFullscreen) { /* IE/Edge */
+				document.msExitFullscreen();
+			}
+		},
+
+		fullScreenMode() {
+			/* Get the documentElement (<html>) to display the page in fullscreen */
+			const elem = document.documentElement;
+			if (elem.requestFullscreen) {
+				elem.requestFullscreen();
+			}
+			else if (elem.mozRequestFullScreen) { /* Firefox */
+				elem.mozRequestFullScreen();
+			}
+			else if (elem.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+				elem.webkitRequestFullscreen();
+			}
+			else if (elem.msRequestFullscreen) { /* IE/Edge */
+				elem.msRequestFullscreen();
+			}
+		},
+
+		// check if event is arrow button or toolbar button
+		checkIfIsButton(eventEmit) {
+			const elements = '.cool-lightbox-button, .cool-lightbox-button *, .cool-lightbox-toolbar__btn, .cool-lightbox-toolbar__btn *';
+			return !!event.target.matches(elements);
+		},
+
+		// start swipe event
+		startSwipe(event) {
+			if (this.isZooming) {
+				return false;
+			}
+
+			// check if is some button
+			if (this.checkIfIsButton(event)) {
+				return false;
+			}
+
+			// clear interval
+			clearInterval(this.swipeInterval);
+			this.swipeAnimation = null;
+
+			// starts swipe
+			this.isDraggingSwipe = true;
+			this.initialMouseX = this.getMouseXPosFromEvent(event);
+			this.initialMouseY = this.getMouseYPosFromEvent(event);
+		},
+
+		// continue swipe event
+		continueSwipe(event) {
+			if (this.isDraggingSwipe) {
+				this.IsSwipping = true;
+				const currentPosX = this.getMouseXPosFromEvent(event);
+				const currentPosY = this.getMouseYPosFromEvent(event);
+				const windowWidth = this.lightboxInnerWidth;
+
+				// diffs
+				const diffX = Math.abs(currentPosX - this.initialMouseX);
+				const diffY = Math.abs(currentPosY - this.initialMouseY);
+
+				// swipe type
+				if (this.swipeType == null) {
+					if (diffY > 5 || diffX > 5) {
+						if (diffY > diffX) {
+							this.swipeType = 'v';
+						}
+						else {
+							this.swipeType = 'h';
+						}
+					}
+				}
+
+				// swipe
+				if (this.swipeType === 'h') {
+					// swipe wrapper
+					this.xSwipeWrapper = -(windowWidth * this.imgIndex) + currentPosX - this.initialMouseX - 30 * this.imgIndex;
+				}
+				else {
+					this.ySwipeWrapper = currentPosY - this.initialMouseY;
+				}
+
+				// mobile caseS
+				if (event.type === 'touchmove') {
+					this.endMouseX = this.getMouseXPosFromEvent(event);
+					this.endMouseY = this.getMouseYPosFromEvent(event);
+				}
+			}
+		},
+
+		// end swipe event
+		endSwipe(event) {
+			if (this.checkIfIsButton(event) && this.initialMouseX === 0) {
+				return false;
+			}
+
+			// event check is dragging and swipe
+			const self = this;
+			const swipeType = this.swipeType;
+			this.isDraggingSwipe = false;
+
+			// horizontal swipe type
+			if (this.initialMouseX === 0 && swipeType === 'h') {
+				return false;
+			}
+
+			// touch end fixes
+			if (event.type !== 'touchend') {
+				this.endMouseX = this.getMouseXPosFromEvent(event);
+				this.endMouseY = this.getMouseYPosFromEvent(event);
+			}
+			else if (this.endMouseX === 0) {
+				return;
+			}
+
+			// check if is dragged
+			if (
+				((this.endMouseX - this.initialMouseX === 0) && swipeType === 'h') ||
+					this.isZooming ||
+					((this.endMouseY - this.initialMouseY === 0) && swipeType === 'v')
+			) {
+				return;
+			}
+
+			// set swipe animation
+			this.setSwipeAnimation();
+
+			// reset swipe data
+			setTimeout(function() {
+				self.IsSwipping = false;
+				self.initialMouseX = 0;
+				self.endMouseX = 0;
+			}, 10);
+
+			// type of swipe
+			if (this.swipeType === 'h') {
+				// if the swipe is to the right
+				if ((this.endMouseX - this.initialMouseX) < -40) {
+					return this.swipeToRight();
+				}
+
+				// if the swipe is to the left
+				if ((this.endMouseX - this.initialMouseX) > 40) {
+					return this.swipeToLeft();
+				}
+			}
+
+			if (this.swipeType === 'v') {
+				const diffY = Math.abs(this.endMouseY - this.initialMouseY);
+
+				// diff Y
+				if (diffY >= 90) {
+					this.close();
+				}
+				else {
+					this.ySwipeWrapper = 0;
+				}
+			}
+
+			this.swipeType = null;
+			const windowWidth = this.lightboxInnerWidth;
+			this.xSwipeWrapper = -this.imgIndex * windowWidth - 30 * this.imgIndex;
+		},
+
+		// swipe to left effect
+		swipeToLeft() {
+			if (!this.hasPrevious && this.effect === 'swipe') {
+				this.xSwipeWrapper = -this.imgIndex * this.lightboxInnerWidth - 30 * this.imgIndex;
+			}
+
+			this.changeIndexToPrev();
+		},
+
+		// swipe to right effect
+		swipeToRight() {
+			if (!this.hasNext && this.effect === 'swipe') {
+				this.xSwipeWrapper = -this.imgIndex * this.lightboxInnerWidth - 30 * this.imgIndex;
+			}
+
+			this.changeIndexToNext();
+		},
+
+		// function that return x position from event
+		getMouseXPosFromEvent(event) {
+			if (event.type.includes('mouse')) {
+				return event.clientX;
+			}
+			return event.touches[0].clientX;
+		},
+
+		// function that return Y position from event
+		getMouseYPosFromEvent(event) {
+			if (event.type.includes('mouse')) {
+				return event.clientY;
+			}
+			return event.touches[0].clientY;
+		},
+
+		// check if the image is cached
+		is_cached(src) {
+			const image = new Image();
+			image.src = src;
+
+			return image.complete;
+		},
+
+		// image loaded event
+		imageLoaded() {
+			this.imageLoading = false;
+		},
+
+		// get video url
+		itemThumb(itemUrl, itemIndex) {
+			const thumb = this.getItemThumb(itemIndex);
+			if (thumb) {
+				return thumb;
+			}
+
+			const youtubeID = this.getYoutubeID(itemUrl);
+			if (youtubeID) {
+				return 'https://img.youtube.com/vi/' + youtubeID + '/mqdefault.jpg';
+			}
+
+			const vimeoID = this.getVimeoID(itemUrl);
+			if (vimeoID) {
+				return false;
+			}
+
+			return itemUrl;
+		},
+
+		// get item src
+		getItemSrc(imgIndex) {
+			if (imgIndex === null) {
+				return false;
+			}
+
+			const item = this.items[imgIndex];
+			if (this.checkIfIsObject(imgIndex)) {
+				return item[this.srcName];
+			}
+
+			return item;
+		},
+
+		getItemThumb(imgIndex) {
+			if (imgIndex === null) {
+				return false;
+			}
+
+			const item = this.items[imgIndex];
+			if (this.checkIfIsObject(imgIndex)) {
+				return item[this.srcThumb];
+			}
+
+			if (this.getVideoUrl(item)) {
+				return false;
+			}
+
+			return item;
+		},
+
+		// toggle play slideshow event
+		togglePlaySlideshow() {
+			if (!this.slideshow) {
+				return false;
+			}
+
+			if (!this.hasNext && !this.loopData) {
+				return false;
+			}
+			this.isPlayingSlideShow = !this.isPlayingSlideShow;
+
+			// if is playing move if not stop it
+			if (this.isPlayingSlideShow) {
+				this.move();
+			}
+			else {
+				this.stopSlideShow();
+			}
+		},
+
+		// stop slideshow
+		stopSlideShow() {
+			this.isPlayingSlideShow = false;
+			clearInterval(this.intervalProgress);
+			this.stylesInterval = {
+				transform: 'scaleX(0)',
+				transition: 'none',
+			};
+		},
+
+		// move event in zoom
+		move() {
+			const self = this;
+			this.progressWidth = 100;
+			this.intervalProgress = setInterval(frame, this.slideshowDuration + 90);
+
+			self.stylesInterval = {
+				transform: 'scaleX(1)',
+				background: this.slideshowColorBar,
+				'transition-duration': this.slideshowDuration + 'ms',
+			};
+			function frame() {
+				self.stylesInterval = {
+					transform: 'scaleX(0)',
+					transition: 'none',
+				};
+
+				self.onNextClick(true);
+				if (!self.hasNext && !self.loopData) {
+					self.stopSlideShow();
+				}
+				else {
+					setTimeout(function() {
+						self.stylesInterval = {
+							transform: 'scaleX(1)',
+							background: self.slideshowColorBar,
+							'transition-duration': self.slideshowDuration + 'ms',
+						};
+					}, 50);
+				}
+			}
+		},
+
+		// show buttons event
+		showButtons(event) {
+			if (!this.checkIfIsButton(event)) {
+				const self = this;
+				setTimeout(function() {
+					self.buttonsVisible = !self.buttonsVisible;
+				}, 100);
+			}
+		},
+
+		// check if is allowed to drag
+		checkMouseEventPropButton(button) {
+			if (!this.isZooming) {
+				return false;
+			}
+			// mouse left btn click
+			return button === 0;
+		},
+
+		// handle mouse down event
+		handleMouseDown(e) {
+			if (!this.checkMouseEventPropButton(e.button)) {
+				return;
+			}
+			this.lastX = e.clientX;
+			this.lastY = e.clientY;
+			this.isDraging = true;
+			e.stopPropagation();
+		},
+
+		// handle mouse up event
+		handleMouseUp(e) {
+			if (!this.checkMouseEventPropButton(e.button)) {
+				return;
+			}
+			this.isDraging = false;
+			this.lastX = this.lastY = 0;
+
+			// Fix drag zoom out
+			const thisContext = this;
+			setTimeout(function() {
+				thisContext.canZoom = true;
+			}, 100);
+		},
+
+		// handle mouse move event
+		handleMouseMove(e) {
+			if (!this.checkMouseEventPropButton(e.button)) {
+				return;
+			}
+			if (this.isDraging) {
+				this.top = this.top - this.lastY + e.clientY;
+				this.left = this.left - this.lastX + e.clientX;
+				this.lastX = e.clientX;
+				this.lastY = e.clientY;
+				this.canZoom = false;
+
+				const item = e.target.parentNode;
+				item.style.transform = 'translate3d(calc(-50% + ' + this.left + 'px), calc(-50% + ' + this.top + 'px), 0px) scale3d(1.6, 1.6, 1.6)';
+			}
+			e.stopPropagation();
+		},
+
+		// zoom image event
+		zoomImage(indexImage) {
+			if (window.innerWidth < 700) {
+				return false;
+			}
+
+			if (!this.canZoom) {
+				return false;
+			}
+
+			if (this.IsSwipping) {
+				return false;
+			}
+
+			// item zoom
+			let item;
+			if (this.effect === 'swipe') {
+				item = this.$refs.items[this.imgIndex].childNodes[0];
+			}
+			else {
+				item = this.$refs.items.childNodes[0];
+			}
+
+			// zoom variables
+			const isZooming = this.isZooming;
+			const thisContext = this;
+
+			// Is zooming check
+			if (isZooming) {
+				if (!this.isDraging) {
+					this.isZooming = false;
+				}
+			}
+			else {
+				this.isZooming = true;
+			}
+
+			// check if is zooming
+			if (this.isZooming) {
+				this.stopSlideShow();
+
+				// add scale
+				item.style.transform = 'translate3d(calc(-50%), calc(-50%), 0px) scale3d(1.6, 1.6, 1.6)';
+
+				// hide buttons
+				this.buttonsVisible = false;
+
+				// fix drag transition problems
+				setTimeout(function() {
+					thisContext.transition = 'all .0s ease';
+				}, 100);
+			}
+			else {
+				// show buttons
+				this.buttonsVisible = true;
+				this.resetZoom();
+			}
+		},
+
+		// Reset zoom data
+		resetZoom() {
+			this.scale = 1;
+			this.left = 0;
+			this.top = 0;
+			this.canZoom = false;
+			this.isZooming = false;
+			this.swipeType = null;
+			this.transition = 'all .3s ease';
+
+			// only if index is not null
+			if (this.imgIndex !== null && this.imgIndex !== -1) {
+				let item;
+				if (this.effect === 'swipe') {
+					item = this.$refs.items[this.imgIndex].childNodes[0];
+				}
+				else {
+					item = this.$refs.items.childNodes[0];
+				}
+				// reset styles
+				item.style.transform = 'translate3d(calc(-50% + ' + this.left + 'px), calc(-50% + ' + this.top + 'px), 0px) scale3d(1, 1, 1)';
+
+				this.initialMouseX = 0;
+				if (window.innerWidth >= 700) {
+					this.buttonsVisible = true;
+				}
+			}
+		},
+
+		// check if the image is bigger than the viewport
+		checkZoom() {
+			const thisContext = this;
+
+			// check if is a video
+			if (this.getVideoUrl(this.getItemSrc(this.imgIndex))) {
+				this.canZoom = false;
+			}
+
+			// image width and height
+			const img = new Image();
+			img.src = this.itemSrc;
+
+			const coolLightboxWrapper = document.getElementsByClassName('cool-lightbox');
+			const heightWrapperImage = coolLightboxWrapper[0].clientHeight; // height with padding
+
+			img.onload = function() {
+				const width = this.width;
+				const height = this.height;
+
+				if (height > heightWrapperImage) {
+					thisContext.canZoom = true;
+
+					thisContext.imgFullSize = {
+						height: height + 'px',
+						width: width + 'px',
+					};
+				}
+				else {
+					thisContext.canZoom = false;
+				}
+			};
+		},
+
+		// Aspect Ratio responsive video
+		setAspectRatioVideo() {
+			const thisContext = this;
+			let el = document.getElementsByClassName('cool-lightbox__inner');
+			el = el[0];
+
+			const computedStyle = getComputedStyle(el);
+			if (window.innerWidth < 700) {
+				const width = el.clientWidth;
+				const height = Math.round((width / 16) * 9);
+
+				this.aspectRatioVideo.height = height + 'px';
+				this.aspectRatioVideo.width = width + 'px';
+			}
+			else {
+				setTimeout(function() {
+					let height = el.clientHeight;
+					height -= parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom);
+
+					const width = (height / 9) * 16;
+
+					thisContext.aspectRatioVideo.height = height + 'px';
+					thisContext.aspectRatioVideo.width = width + 'px';
+				}, 150);
+			}
+		},
+
+		// close event
+		close() {
+			this.stopSlideShow();
+			this.swipeType = null;
+			this.$emit('close', this.imgIndex);
+			this.showThumbs = true;
+			this.imgIndex = null;
+		},
+
+		// close event click outside
+		closeModal(event) {
+			if (window.innerWidth < 700) {
+				return false;
+			}
+
+			if (this.IsSwipping) {
+				return false;
+			}
+
+			const elements = '.cool-lightbox-thumbs, svg, path, rect, .cool-lightbox-thumbs *, .cool-lightbox-button, .cool-lightbox-toolbar__btn, .cool-lightbox-toolbar__btn *, .cool-lightbox-button *, .cool-lightbox__slide__img *, .cool-lightbox-video';
+			if (!event.target.matches(elements)) {
+				this.close();
+			}
+		},
+
+		// set swipe animation
+		setSwipeAnimation() {
+			const self = this;
+			clearInterval(this.swipeInterval);
+			this.swipeAnimation = null;
+
+			// animation swipe
+			this.swipeAnimation = 'all .3s ease';
+			this.swipeInterval = setInterval(interval, 330);
+
+			function interval() {
+				self.swipeAnimation = null;
+			}
+		},
+
+		// next slide event
+		onNextClick(isFromSlideshow = false) {
+			if (this.isZooming) {
+				return false;
+			}
+
+			if (!isFromSlideshow) {
+				this.stopSlideShow();
+			}
+
+			this.setSwipeAnimation();
+			this.changeIndexToNext();
+		},
+
+		// prev slide event
+		onPrevClick() {
+			if (this.isZooming) {
+				return false;
+			}
+
+			this.stopSlideShow();
+			this.setSwipeAnimation();
+			this.changeIndexToPrev();
+		},
+
+		// change to next index
+		changeIndexToNext() {
+			if (this.hasNext) {
+				this.onIndexChange(this.imgIndex + 1);
+			}
+			else if (this.loopData) {
+				this.onIndexChange(0);
+			}
+		},
+
+		// change to prev index
+		changeIndexToPrev() {
+			if (this.hasPrevious) {
+				this.onIndexChange(this.imgIndex - 1);
+			}
+			else if (this.loopData) {
+				this.onIndexChange(this.items.length - 1);
+			}
+		},
+
+		// set lightbox inner width
+		setLightboxInnerWidth() {
+			const el = document.getElementsByClassName('cool-lightbox__inner');
+			const width = el[0].clientWidth;
+			this.lightboxInnerWidth = width;
+		},
+
+		// set x position by img index
+		setXPosition(index) {
+			// set x position
+			this.xSwipeWrapper = -index * this.lightboxInnerWidth - 30 * index;
+		},
+
+		// index change
+		onIndexChange(index) {
+			this.imgIndex = index;
+			this.$emit('on-change', index);
+		},
+
+		// caption size
+		addCaptionPadding() {
+			if (this.checkIfIsObject(this.imgIndex) && (this.items[this.imgIndex].title || this.items[this.imgIndex].descripcion)) {
+				const el = document.getElementsByClassName('cool-lightbox-caption');
+				if (el.length > 0) {
+					this.paddingBottom = el[0].offsetHeight;
+				}
+			}
+			else {
+				this.paddingBottom = 60;
+			}
+		},
+
+		// check if is video
+		getVideoUrl(itemSrc) {
+      if (itemSrc) {
+        const youtubeUrl = this.getYoutubeUrl(itemSrc);
+        const vimeoUrl = this.getVimeoUrl(itemSrc);
+        const mp4Url = this.checkIsMp4(itemSrc);
+
+        if (youtubeUrl) {
+          return youtubeUrl;
+        }
+
+        if (vimeoUrl) {
+          return vimeoUrl;
+        }
+
+        if (mp4Url) {
+          return mp4Url;
+        }
+
+        return false;
+      }
+		},
+
+		// getYoutube ID
+		getYoutubeID(url) {
+			// youtube data
+			const youtubeRegex = /^(?:https?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+			const ytId = (url.match(youtubeRegex)) ? RegExp.$1 : false;
+
+			if (ytId) {
+				return ytId;
+			}
+
+			return false;
+		},
+
+		// get youtube url
+		getYoutubeUrl(url) {
+			// youtube data
+			const ytId = this.getYoutubeID(url);
+
+			// if is youtube video
+			if (ytId) {
+				return 'https://www.youtube.com/embed/' + ytId;
+			}
+
+			return false;
+		},
+
+		// vimeo ID
+		getVimeoID(url) {
+			// if is vimeo video
+			// eslint-disable-next-line no-useless-escape
+			const result = url.match(/(?:www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:[a-zA-Z0-9_\-]+)?/i);
+			if (result !== null) {
+				return result[1];
+			}
+
+			return false;
+		},
+
+		// get vimeo url
+		getVimeoUrl(url) {
+			// if is vimeo video
+			// eslint-disable-next-line no-useless-escape
+			const result = url.match(/(?:www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:[a-zA-Z0-9_\-]+)?/i);
+			if (result !== null) {
+				return '//player.vimeo.com/video/' + result[1] + '?hd=1&show_title=1&show_byline=1&show_portrait=0&fullscreen=1';
+			}
+
+			return false;
+		},
+
+		checkIsMp4(url) {
+			if (this.imgIndex === null) {
+				return false;
+			}
+
+			const str = String(url);
+			if (str.endsWith('.mp4')) {
+				return url;
+			}
+
+			return false;
+		},
+
+		// check if item is object
+		checkIfIsObject(itemIndex) {
+			const item = this.items[itemIndex];
+			if (typeof item === 'object' && item !== null) {
+				return true;
+			}
+			return false;
+		},
+
+		// arrows and escape events
+		eventListener(e) {
+			switch (e.keyCode) {
+				case 39:
+					return this.onNextClick();
+				case 37:
+					return this.onPrevClick();
+				case 38:
+				case 40:
+				case ' ':
+					return e.preventDefault();
+				case 27:
+					return this.close();
+			}
+		},
+	},
+};
+</script>
+
+<style lang="scss">
+  // TODO: replace CSS properties with the Tailwind class
+	// A map of breakpoints.
+	$breakpoints: (
+			phone-sm: 420px,
+			phone: 767px,
+			tablet-lg: 1024px,
+			desktop: 1202px
+	);
+
+	// Breakpoints SCSS
+	@mixin breakpoint($breakpoint) {
+
+		// If the breakpoint exists in the map.
+		@if map-has-key($breakpoints, $breakpoint) {
+
+			// Get the breakpoint value.
+			$breakpoint-value: map-get($breakpoints, $breakpoint);
+
+			//Build the media query
+			@media (min-width: $breakpoint-value) {
+				@content;
+			}
+		}
+	}
+
+	.cool-lightbox {
+		position: fixed;
+		left: 0;
+		bottom: 0;
+		top: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		right: 0;
+		transition: all .3s ease;
+		.cool-lightbox-thumbs {
+			position: absolute;
+			height: 100vh;
+			overflow-y: auto;
+			width: 102px;
+			right: -102px;
+			top: 0;
+			overflow-x: hidden;
+			transition: none;
+			background-color: #ddd;
+			scrollbar-width: thin;
+			scrollbar-color: #fa4242 rgba(175, 175, 175, 0.9);
+			@include breakpoint(phone) {
+				transition: all .3s ease;
+			}
+			&::-webkit-scrollbar {
+				width: 6px;
+				height: 6px;
+			}
+			&::-webkit-scrollbar-button {
+				width: 0px;
+				height: 0px;
+			}
+			&::-webkit-scrollbar-thumb {
+				background: #fa4242;
+				border: 0px none #ffffff;
+				border-radius: 50px;
+			}
+			&::-webkit-scrollbar-thumb:hover {
+				background: #ffffff;
+			}
+			&::-webkit-scrollbar-thumb:active {
+				background: #000000;
+			}
+			&::-webkit-scrollbar-track {
+				background: #e1e1e1;
+				border: 0px none #ffffff;
+				border-radius: 8px;
+			}
+			&::-webkit-scrollbar-track:hover {
+				background: #666666;
+			}
+			&::-webkit-scrollbar-track:active {
+				background: #333333;
+			}
+			&::-webkit-scrollbar-corner {
+				background: transparent;
+			}
+			@include breakpoint(phone) {
+				width: 212px;
+				right: -212px;
+			}
+			.cool-lightbox-thumbs__list {
+				display: flex;
+				flex-wrap: wrap;
+				padding: 2px;
+				padding-right: 0;
+				.cool-lightbox__thumb {
+					background-color: black;
+					width: 100%;
+					margin-right: 2px;
+					margin-bottom: 2px;
+					display: block;
+					height: 75px;
+					position: relative;
+					@include breakpoint(phone) {
+						width: calc(100%/2 - 2px);
+					}
+					&:before {
+						top: 0;
+						left: 0;
+						right: 0;
+						bottom: 0;
+						opacity: 0;
+						content: '';
+						z-index: 150;
+						transition: all .3s ease;
+						position: absolute;
+						visibility: hidden;
+						border: 3px solid #fa4242;
+					}
+					img {
+						width: 100%;
+						height: 100%;
+						object-fit: cover;
+					}
+					&.is-video {
+						.cool-lightbox__thumb__icon {
+							position: absolute;
+							z-index: 100;
+							top: 50%;
+							left: 50%;
+							width: 25px;
+							height: 25px;
+							transform: translate(-50%,-50%);
+							path {
+								fill: #FFF;
+							}
+						}
+						&:after {
+							content: '';
+							top: 0;
+							left: 0;
+							right: 0;
+							bottom: 0;
+							z-index: 50;
+							position: absolute;
+							background: rgba(0,0,0, 0.6);
+						}
+					}
+					&.active, &:hover {
+						&:before {
+							opacity: 1;
+							visibility: visible;
+						}
+					}
+				}
+			}
+		}
+		.cool-lightbox__inner {
+      padding: 0 !important;
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			overflow: hidden;
+			transition: none;
+			@include breakpoint(phone) {
+				transition: all .3s ease;
+			}
+		}
+		.cool-lightbox__progressbar {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 2px;
+			z-index: 500;
+			transform-origin: 0;
+			transform: scaleX(0);
+			transition: transform 3s linear;
+			display: block;
+		}
+		&.cool-lightbox--is-swipping {
+			cursor: -webkit-grabbing;
+			cursor: grabbing;
+			iframe {
+				pointer-events: none;
+			}
+			.cool-lightbox__slide {
+				transition: none;
+				&.cool-lightbox__slide--hide, &.cool-lightbox__slide--hide {
+					display: flex;
+					z-index: 50;
+				}
+			}
+		}
+		&.cool-lightbox--can-zoom {
+			.cool-lightbox__slide {
+				img {
+					cursor: zoom-in;
+				}
+			}
+		}
+		&.cool-lightbox--is-zooming {
+			.cool-lightbox__slide {
+				img {
+					cursor: move; /* fallback if grab cursor is unsupported */
+					cursor: grab;
+					cursor: -moz-grab;
+					cursor: -webkit-grab;
+				}
+			}
+			.cool-lightbox-caption {
+				opacity: 0;
+			}
+		}
+		&.cool-lightbox--thumbs-right {
+			&.cool-lightbox--show-thumbs {
+				.cool-lightbox__inner {
+					right: 102px;
+					@include breakpoint(phone) {
+						right: 212px;
+					}
+				}
+				.cool-lightbox-thumbs {
+					right: 0;
+				}
+			}
+		}
+		&.cool-lightbox--thumbs-bottom {
+			.cool-lightbox-thumbs {
+				width: 100%;
+				left: 0;
+				right: 0;
+				top: auto;
+				height: 70px;
+				bottom: -70px;
+				overflow: auto;
+				@include breakpoint(phone) {
+					bottom: -79px;
+					height: 79px;
+				}
+				.cool-lightbox-thumbs__list {
+					width: 100%;
+					flex-wrap: nowrap;
+					justify-content: center;
+					.cool-lightbox__thumb {
+						width: 100px;
+						flex-shrink: 0;
+						margin-bottom: 0;
+						height: 65px;
+						@include breakpoint(phone) {
+							height: 75px;
+						}
+					}
+				}
+			}
+			&.cool-lightbox--show-thumbs {
+				.cool-lightbox__inner {
+					bottom: 70px;
+					@include breakpoint(phone) {
+						bottom: 79px;
+					}
+				}
+				.cool-lightbox-thumbs {
+					bottom: 0;
+				}
+			}
+		}
+		* {
+			box-sizing: border-box;
+			padding: 0;
+			margin: 0;
+		}
+		button {
+			background: none;
+			border: none;
+			cursor: pointer;
+			outline: none;
+		}
+		svg {
+			path, rect {
+				fill: currentColor;
+			}
+		}
+		.cool-lightbox-button {
+			padding: 21px 16px 21px 4px;
+			height: 100px;
+			opacity: 1;
+			z-index: 800;
+			color: #ccc;
+			transition: all .3s ease;
+			position: absolute;
+			top: calc(50% - 50px);
+			width: 54px;
+			transition: all .3s ease;
+			visibility: visible;
+			@include breakpoint(phone) {
+				width: 70px;
+				padding: 31px 26px 31px 6px;
+			}
+			&.hidden {
+				opacity: 0;
+				visibility: hidden;
+			}
+			&:hover {
+				color: #fff;
+			}
+			> .cool-lightbox-button__icon {
+				padding: 7px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(30,30,30,.6);
+				> svg {
+					width: 100%;
+					height: 100%;
+				}
+			}
+			&.cool-lightbox-button--prev {
+				left: 0;
+			}
+			&.cool-lightbox-button--next {
+				right: 0;
+				padding: 21px 4px 21px 16px;
+				@include breakpoint(phone) {
+					padding: 31px 6px 31px 26px;
+				}
+			}
+		}
+		.cool-lightbox__iframe {
+			width: 100%;
+			display: flex;
+			top: 50%;
+			left: 50%;
+			align-items: center;
+			justify-content: center;
+			position: relative;
+			transform: translate3d(-50%, -50%, 0px) scale3d(1, 1, 1);
+			.cool-lightbox-video {
+			}
+			iframe {
+				//position: absolute;
+				width: 100%;
+				height: 100%;
+				@include breakpoint(phone) {
+					max-width: 80vw;
+					max-height: 80vh;
+				}
+			}
+		}
+		.cool-lightbox__wrapper {
+			width: 100%;
+			height: 100%;
+			position: relative;
+			&.cool-lightbox__wrapper--swipe {
+				display: flex;
+				align-items: center;
+				.cool-lightbox__slide {
+					flex-shrink: 0;
+					display: flex;
+					position: relative;
+					height: 100%;
+					opacity: 0.4;
+					transition: opacity .3s linear;
+					&.cool-lightbox__slide--current {
+						opacity: 1;
+					}
+				}
+			}
+		}
+		.cool-lightbox__slide {
+			width: 100%;
+			top: 0;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			z-index: 100;
+			display: none;
+			position: absolute;
+			margin-right: 30px;
+			&:last-of-type {
+				margin-right: 0;
+			}
+			transition: transform .3s ease;
+			&.cool-lightbox__slide--current {
+				display: flex;
+			}
+			.cool-lightbox__slide__img {
+				position: absolute;
+				height: 100%;
+				width: 100%;
+				left: 50%;
+				top: 50%;
+				-webkit-backface-visibility: hidden;
+				backface-visibility: hidden;
+				transform: translate3d(-50%, -50%, 0px) scale3d(1, 1, 1);
+				transition: all .3s ease;
+				display: flex;
+			}
+			img {
+				max-width: 100%;
+				max-height: 100%;
+				margin: auto;
+				z-index: 9999;
+				box-shadow: 0 0 1.5rem rgba(0,0,0,.45);
+			}
+		}
+	}
+
+	.cool-lightbox-toolbar {
+		position: absolute;
+		top: 0;
+		right: 0;
+		opacity: 1;
+		display: flex;
+		transition: all .3s ease;
+		visibility: visible;
+		&.hidden {
+			opacity: 0;
+			visibility: hidden;
+		}
+		.cool-lightbox-toolbar__btn {
+			background: rgba(30,30,30,.6);
+			border: 0;
+			border-radius: 0;
+			box-shadow: none;
+			cursor: pointer;
+			justify-content: center;
+			align-items: center;
+			display: inline-flex;
+			margin: 0;
+			padding: 9px;
+			position: relative;
+			transition: color .2s;
+			vertical-align: top;
+			visibility: inherit;
+			width: 40px;
+			height: 40px;
+			color: #ccc;
+			@include breakpoint(phone) {
+				width: 44px;
+				height: 44px;
+				padding: 10px;
+			}
+			> svg {
+				width: 100%;
+				height: 100%;
+			}
+			&:hover {
+				color: #FFFFFF;
+			}
+		}
+	}
+
+	.cool-lightbox-caption {
+		bottom: 0;
+		color: #eee;
+		font-size: 14px;
+		font-weight: 400;
+		left: 0;
+		opacity: 1;
+		line-height: 1.5;
+		padding: 18px 28px 16px 24px;
+		pointer-events: none;
+		right: 0;
+		text-align: center;
+		z-index: 99996;
+		direction: ltr;
+		position: absolute;
+		transition: opacity .25s ease,visibility 0s ease .25s;
+		z-index: 99997;
+		background: linear-gradient(0deg,rgba(0,0,0,.75) 0,rgba(0,0,0,.3) 50%,rgba(0,0,0,.15) 65%,rgba(0,0,0,.075) 75.5%,rgba(0,0,0,.037) 82.85%,rgba(0,0,0,.019) 88%,transparent);
+		@include breakpoint(phone) {
+			padding: 22px 30px 23px 30px;
+		}
+		h6 {
+			font-size: 14px;
+			margin: 0 0 6px 0;
+			line-height: 130%;
+			@include breakpoint(phone) {
+				font-size: 16px;
+				margin: 0 0 6px 0;
+			}
+		}
+		p {
+			font-size: 13px;
+			line-height: 130%;
+			color: #ccc;
+			@include breakpoint(phone) {
+				font-size: 15px;
+			}
+		}
+	}
+
+	.cool-lightbox-modal-enter-active, .cool-lightbox-modal-leave-active {
+		transition: opacity .35s
+	}
+	.cool-lightbox-modal-enter, .cool-lightbox-modal-leave-to {
+		opacity: 0
+	}
+
+	.cool-lightbox-slide-change-enter-active, .cool-lightbox-slide-change-leave-active {
+		transition: opacity 0.27s;
+	}
+
+	.cool-lightbox-slide-change-enter, .cool-lightbox-slide-change-leave-to  {
+		opacity: 0;
+	}
+
+	.cool-lightbox-loading-wrapper {
+		top: 50%;
+		left: 50%;
+		position: absolute;
+		transform: translate(-50%, -50%);
+		.cool-lightbox-loading {
+			animation: cool-lightbox-rotate 1s linear infinite;
+			background: transparent;
+			border: 4px solid #888;
+			border-bottom-color: #fff;
+			border-radius: 50%;
+			height: 50px;
+			opacity: .7;
+			padding: 0;
+			width: 50px;
+			z-index: 500;
+		}
+	}
+
+	@keyframes cool-lightbox-rotate {
+		100% {
+			transform: rotate(360deg);
+		}
+	}
+</style>

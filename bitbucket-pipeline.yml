@@ -1,0 +1,42 @@
+# This is an example Starter pipeline configuration
+# Use a skeleton to build, test and deploy using manual and parallel steps
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+
+image: node:16.13.0
+
+pipelines:
+  branches:
+    master:
+      - step:
+          name: Install packages
+          caches:
+            - node
+          script:
+            - yarn install
+            - yarn generate
+          artifacts:
+            - node_modules/**
+            - dist/**
+      - step:
+          name: Deploy
+          deployment: production
+          script:
+            - echo "Your deployment to production script goes here..."
+
+    staging:
+      - step:
+          name: Install packages
+          caches:
+            - node
+          script:
+            - yarn install
+            - yarn generate
+          artifacts:
+            - node_modules/**
+            - dist/**
+      - step:
+          name: Deploy
+          deployment: production
+          script:
+            - echo "Your deployment to production script goes here..."

@@ -1,0 +1,170 @@
+/*! purgecss start ignore */
+
+@import '@/assets/css/_variables.scss';
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    color: $primary-dark;
+}
+
+.heroscript {
+    font-size: 12rem;
+}
+
+.nuxt-lazy-loaded-is-loading {
+    -webkit-filter: blur(10px);
+            filter: blur(10px);
+    transition: -webkit-filter 0.5s;
+    transition:         filter 0.5s;
+    transition:         filter 0.5s, -webkit-filter 0.5s;
+    will-change: filter;
+}
+
+.nuxt-lazy-loaded-is-loaded {
+    -webkit-filter: blur(0);
+            filter: blur(0);
+}
+
+
+/*Typography*/
+
+h1 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.2;
+    @screen sm {
+        font-size: 1.75rem;
+    }
+    @screen md {
+        font-size: 2rem;
+    }
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    @screen sm {
+        font-size: 1.5rem;
+    }
+    @screen md {
+        font-size: 1.75rem;
+    }
+}
+
+h3 {
+    font-size: 1.05rem;
+    font-weight: 400;
+}
+
+
+/* Toast */
+
+.toasted-container .toasted {
+    border-radius: 0.5rem !important;
+    background: #FFF !important;
+    border: 1px solid transparent;
+    color: $primary-dark !important;
+    font-size: 0.875rem !important;
+}
+
+.toasted .primary.error, .toasted.toasted-primary.error {
+    border-color: $primary-red;
+}
+
+
+/* Transitions */
+
+.gsr-fade-top {
+    &-enter-active, &-leave-active {
+        transition: all 0.3s;
+    }
+    &-enter {
+        transform: translateY(-25px);
+        opacity: 0;
+    }
+    &-leave-to {
+        transform: translateY(25px);
+        opacity: 0;
+    }
+}
+
+.gsr-fade {
+    &-enter-active, &-leave-active {
+        transition: opacity 0.25s linear;
+    }
+    &-enter, &-leave-to {
+        opacity: 0;
+    }
+}
+
+
+/* scale in animation */
+
+.scale-in-enter, .scale-in-leave-to {
+    transform: scale(0.88);
+    opacity: 0;
+}
+
+.scale-in-enter-active, .scale-in-leave-active {
+    transition: transform 0.3s, opacity 0.5s;
+}
+
+
+/* scale in animation */
+
+.expand-enter, .expand-leave-to {
+    transform: scale(1.10) translateY(60px);
+    opacity: 0;
+}
+
+.expand-enter-active, .expand-leave-active {
+    transition: transform 0.5s, opacity 1.5s;
+}
+
+
+/* fade up */
+
+.fade-y-enter, .fade-y-leave-to {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.fade-y-enter-active, .fade-y-leave-active {
+    transition: opacity 0.3s, transform 0.5s;
+}
+
+@-webkit-keyframes zoomTransition {
+    //5% {
+    //  -webkit-transform: scale(0.5);
+    //}
+    //50% {
+    //  -webkit-transform: scale(1);
+    //}
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+
+/*Mixins*/
+
+@mixin rows-truncate($rows) {
+    @apply truncate;
+    @supports (-webkit-line-clamp: $rows) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: initial;
+        display: -webkit-box;
+        -webkit-line-clamp: $rows;
+        -webkit-box-orient: vertical;
+    }
+}

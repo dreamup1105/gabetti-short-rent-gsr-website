@@ -1,0 +1,55 @@
+<template>
+  <GsrBoxedLayout class="pb-12">
+    <GsrBlocksList :blocks="blocks"/>
+    <section class="space-y-4 py-6" v-for="block in blocks.filter((block) => block.key ==='articles')"
+             :key="block.id">
+      <div class="grid grid-cols-1 gap-4">
+        <nuxt-link v-for="item in block.items" :key="item.id" :to="localePath(`/${item.content.permalink.value}`)">
+        <GsrCmsArticleCard
+          :data="item"
+        />
+        </nuxt-link>
+      </div>
+    </section>
+  </GsrBoxedLayout>
+</template>
+
+<script>
+
+export default {
+  name: 'PressReview',
+  components: {
+    GsrBoxedLayout: () => import('@/components/layout/GsrBoxedLayout'),
+    GsrBlocksList: () => import('@/components/cms/GsrBlocksList'),
+    GsrCmsStandardCard: () => import('@/components/cms/GsrCmsStandardCard'),
+    GsrCmsArticleCard: () => import('@/components/cms/GsrCmsArticleCard'),
+
+  },
+  /**
+   * @desc Async data
+   * @param route
+   * @param app
+   * @param query
+   * @param error
+   * @returns {Promise<{accommodation}>}
+   */
+  async asyncData({route, app, query, error}) {
+    // Get route data from path
+    const routeData = app.$services.route.extractLocaleAndPermalinkFromRoute(route.path);
+    let blocks;
+    try {
+      blocks = (await app.$services.cms.getPage(routeData.permalink, routeData.locale)).data
+    } catch (e) {
+      console.error(e)
+    }
+
+    return {
+      routeData,
+      blocks,
+    };
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+</style>
